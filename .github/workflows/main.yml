@@ -19,8 +19,8 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install selenium
-        sudo apt-get install -y unzip wget
+        pip install selenium webdriver-manager
+        sudo apt-get install -y unzip wget xvfb
 
     - name: Setup Chrome Profile
       run: |
@@ -34,24 +34,16 @@ jobs:
         wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
         sudo apt install -y ./google-chrome-stable_current_amd64.deb
         
-        # Clean existing chromedriver
-        sudo rm -f /usr/bin/chromedriver /usr/local/bin/chromedriver
+        # Install matching Chromedriver using webdriver-manager
+        python -c "from webdriver_manager.chrome import ChromeDriverManager; print(ChromeDriverManager().install())"
         
-        # Install Chromedriver
-        wget https://storage.googleapis.com/chrome-for-testing-public/139.0.7258.68/linux64/chromedriver-linux64.zip
-        sudo unzip -j chromedriver-linux64.zip '*/chromedriver' -d /usr/local/bin/
-        sudo chmod +x /usr/local/bin/chromedriver
-        sudo ln -sf /usr/local/bin/chromedriver /usr/bin/chromedriver
-        
-        # Verify installation
+        # Verify versions
         echo "Chrome version: $(google-chrome --version)"
-        echo "Chromedriver version: $(chromedriver --version)"
-        echo "Chromedriver path: $(which chromedriver)"
-        ls -la /usr/local/bin/chromedriver /usr/bin/chromedriver
+        chromedriver --version
 
-    - name: Run Selenium Test
+    - name: Run Selenium Test with Xvfb
       run: |
-        python -c "
+        xvfb-run python -c "
         from selenium import webdriver
         from selenium.webdriver.chrome.options import Options
         import os
@@ -62,6 +54,9 @@ jobs:
         options.add_argument('--headless=new')
         options.add_argument('--no-sandbox')
         options.add_argument('--disable-dev-shm-usage')
+        options.add_argument('--disable-gpu')
+        options.add_argument('--remote-debugging-port=9222')
+        options.add_argument('--window-size=1920,1080')
         
         try:
             driver = webdriver.Chrome(options=options)
