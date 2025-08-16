@@ -20,7 +20,7 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install selenium webdriver-manager
-        sudo apt-get install -y unzip
+        sudo apt-get install -y unzip wget
 
     - name: Setup Chrome Profile
       run: |
@@ -28,16 +28,20 @@ jobs:
         unzip ChromeProfile_ultra.zip -d ~/.config/google-chrome/
         chmod -R 755 ~/.config/google-chrome
 
-    - name: Install Chrome and Chromedriver
+    - name: Install Matching Chrome/Chromedriver Versions
       run: |
+        # Install specific Chrome version
         sudo apt-get update
-        sudo apt-get install -y google-chrome-stable
-        LATEST=$(curl -s https://chromedriver.storage.googleapis.com/LATEST_RELEASE)
-        wget https://chromedriver.storage.googleapis.com/$LATEST/chromedriver_linux64.zip
+        sudo apt-get install -y google-chrome-stable=139.0.7258.66-1
+        
+        # Get matching chromedriver
+        wget https://chromedriver.storage.googleapis.com/139.0.7258.68/chromedriver_linux64.zip
         sudo unzip chromedriver_linux64.zip -d /usr/local/bin/
         sudo chmod +x /usr/local/bin/chromedriver
-        google-chrome --version
-        chromedriver --version
+        
+        # Verify versions
+        echo "Chrome version: $(google-chrome --version)"
+        echo "Chromedriver version: $(chromedriver --version)"
 
     - name: Run Selenium Test
       run: |
@@ -63,10 +67,10 @@ jobs:
             print('Current URL:', driver.current_url)
             print('Page title:', driver.title)
             assert 'YouTube' in driver.title
-            print('Test passed!')
+            print('✓ Test passed!')
             driver.quit()
         except Exception as e:
-            print('Test failed:', str(e))
+            print('✗ Test failed:', str(e))
             if 'driver' in locals():
                 driver.quit()
             raise
