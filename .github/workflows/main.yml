@@ -19,7 +19,7 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install selenium webdriver-manager
+        pip install selenium
         sudo apt-get install -y unzip wget
 
     - name: Setup Chrome Profile
@@ -28,20 +28,17 @@ jobs:
         unzip ChromeProfile_ultra.zip -d ~/.config/google-chrome/
         chmod -R 755 ~/.config/google-chrome
 
-    - name: Install Chrome and Chromedriver
+    - name: Install Chrome and Chromedriver (Exact Versions)
       run: |
-        # Install Chrome 138 to match your chromedriver
-        wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
-        echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" | sudo tee /etc/apt/sources.list.d/google-chrome.list
-        sudo apt-get update
-        sudo apt-get install -y google-chrome-stable=138.0.7204.183-1
-
-        # Install your specific chromedriver version
-        wget https://storage.googleapis.com/chrome-for-testing-public/138.0.7204.183/linux64/chromedriver-linux64.zip
-        sudo unzip chromedriver-linux64.zip -d /usr/local/bin/
-        sudo mv /usr/local/bin/chromedriver-linux64/chromedriver /usr/local/bin/
-        sudo chmod +x /usr/local/bin/chromedriver
-
+        # Install Chrome 139.0.7258.128
+        wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+        sudo apt install -y ./google-chrome-stable_current_amd64.deb
+        
+        # Install matching Chromedriver 139.0.7258.68
+        wget https://storage.googleapis.com/chrome-for-testing-public/139.0.7258.68/linux64/chromedriver-linux64.zip
+        unzip chromedriver-linux64.zip -d /usr/local/bin/
+        chmod +x /usr/local/bin/chromedriver
+        
         # Verify versions
         echo "Chrome version: $(google-chrome --version)"
         echo "Chromedriver version: $(chromedriver --version)"
@@ -59,12 +56,20 @@ jobs:
         options.add_argument('--headless=new')
         options.add_argument('--no-sandbox')
         options.add_argument('--disable-dev-shm-usage')
+        options.add_argument('--disable-gpu')
+        options.add_argument('--window-size=1920,1080')
         
-        driver = webdriver.Chrome(options=options)
         try:
+            driver = webdriver.Chrome(options=options)
+            print('Navigating to YouTube...')
             driver.get('https://www.youtube.com')
+            print('Current URL:', driver.current_url)
+            print('Page title:', driver.title)
             assert 'YouTube' in driver.title
             print('✓ Test passed!')
-        finally:
             driver.quit()
+        except Exception as e:
+            print('✗ Test failed:', str(e))
+            if 'driver' in locals(): driver.quit()
+            raise
         "
