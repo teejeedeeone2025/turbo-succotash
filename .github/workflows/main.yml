@@ -9,7 +9,7 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
       with:
-        lfs: true  # Required for Git LFS files
+        lfs: true
 
     - name: Set up Python
       uses: actions/setup-python@v4
@@ -22,16 +22,22 @@ jobs:
         pip install selenium webdriver-manager
         sudo apt-get install -y unzip
 
-    - name: Download Chrome Profile
+    - name: Setup Chrome Profile
       run: |
+        mkdir -p ~/.config/google-chrome/Profile\ 1
         unzip ChromeProfile_ultra.zip -d ~/.config/google-chrome/
-        ls -la ~/.config/google-chrome/  # Verify extraction
+        chmod -R 755 ~/.config/google-chrome
 
-    - name: Install Chrome
+    - name: Install Chrome and Chromedriver
       run: |
         sudo apt-get update
         sudo apt-get install -y google-chrome-stable
+        LATEST=$(curl -s https://chromedriver.storage.googleapis.com/LATEST_RELEASE)
+        wget https://chromedriver.storage.googleapis.com/$LATEST/chromedriver_linux64.zip
+        sudo unzip chromedriver_linux64.zip -d /usr/local/bin/
+        sudo chmod +x /usr/local/bin/chromedriver
         google-chrome --version
+        chromedriver --version
 
     - name: Run Selenium Test
       run: |
@@ -46,14 +52,22 @@ jobs:
         options.add_argument('--headless=new')
         options.add_argument('--no-sandbox')
         options.add_argument('--disable-dev-shm-usage')
+        options.add_argument('--disable-gpu')
+        options.add_argument('--remote-debugging-port=9222')
+        options.add_argument('--window-size=1920,1080')
         
-        driver = webdriver.Chrome(options=options)
         try:
+            driver = webdriver.Chrome(options=options)
             print('Navigating to YouTube...')
             driver.get('https://www.youtube.com')
+            print('Current URL:', driver.current_url)
             print('Page title:', driver.title)
             assert 'YouTube' in driver.title
             print('Test passed!')
-        finally:
             driver.quit()
+        except Exception as e:
+            print('Test failed:', str(e))
+            if 'driver' in locals():
+                driver.quit()
+            raise
         "
