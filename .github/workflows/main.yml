@@ -28,16 +28,16 @@ jobs:
         unzip ChromeProfile_ultra.zip -d ~/.config/google-chrome/
         chmod -R 755 ~/.config/google-chrome
 
-    - name: Install Chrome and Chromedriver (Exact Versions)
+    - name: Install Chrome and Chromedriver
       run: |
-        # Install Chrome 139.0.7258.128
+        # Install Chrome
         wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
         sudo apt install -y ./google-chrome-stable_current_amd64.deb
         
-        # Install matching Chromedriver 139.0.7258.68
+        # Install Chromedriver (corrected extraction path)
         wget https://storage.googleapis.com/chrome-for-testing-public/139.0.7258.68/linux64/chromedriver-linux64.zip
-        unzip chromedriver-linux64.zip -d /usr/local/bin/
-        chmod +x /usr/local/bin/chromedriver
+        sudo unzip -j chromedriver-linux64.zip chromedriver -d /usr/local/bin/
+        sudo chmod +x /usr/local/bin/chromedriver
         
         # Verify versions
         echo "Chrome version: $(google-chrome --version)"
@@ -56,15 +56,12 @@ jobs:
         options.add_argument('--headless=new')
         options.add_argument('--no-sandbox')
         options.add_argument('--disable-dev-shm-usage')
-        options.add_argument('--disable-gpu')
-        options.add_argument('--window-size=1920,1080')
         
         try:
             driver = webdriver.Chrome(options=options)
             print('Navigating to YouTube...')
             driver.get('https://www.youtube.com')
-            print('Current URL:', driver.current_url)
-            print('Page title:', driver.title)
+            print('Title:', driver.title)
             assert 'YouTube' in driver.title
             print('✓ Test passed!')
             driver.quit()
