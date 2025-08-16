@@ -28,19 +28,20 @@ jobs:
         unzip ChromeProfile_ultra.zip -d ~/.config/google-chrome/
         chmod -R 755 ~/.config/google-chrome
 
-    - name: Install Exact Chrome Version
+    - name: Install Chrome and Chromedriver
       run: |
-        # Install specific Chrome version matching your local (139.0.7258.128)
+        # Install Chrome 138 to match your chromedriver
         wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
         echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" | sudo tee /etc/apt/sources.list.d/google-chrome.list
         sudo apt-get update
-        sudo apt-get install -y google-chrome-stable=139.0.7258.128-1
-        
-        # Install matching chromedriver (139.0.7258.128)
-        wget https://chromedriver.storage.googleapis.com/139.0.7258.128/chromedriver_linux64.zip
-        sudo unzip chromedriver_linux64.zip -d /usr/local/bin/
+        sudo apt-get install -y google-chrome-stable=138.0.7204.183-1
+
+        # Install your specific chromedriver version
+        wget https://storage.googleapis.com/chrome-for-testing-public/138.0.7204.183/linux64/chromedriver-linux64.zip
+        sudo unzip chromedriver-linux64.zip -d /usr/local/bin/
+        sudo mv /usr/local/bin/chromedriver-linux64/chromedriver /usr/local/bin/
         sudo chmod +x /usr/local/bin/chromedriver
-        
+
         # Verify versions
         echo "Chrome version: $(google-chrome --version)"
         echo "Chromedriver version: $(chromedriver --version)"
@@ -58,18 +59,12 @@ jobs:
         options.add_argument('--headless=new')
         options.add_argument('--no-sandbox')
         options.add_argument('--disable-dev-shm-usage')
-        options.add_argument('--remote-debugging-port=9222')
         
+        driver = webdriver.Chrome(options=options)
         try:
-            driver = webdriver.Chrome(options=options)
-            print('Navigating to YouTube...')
             driver.get('https://www.youtube.com')
-            print('Title:', driver.title)
             assert 'YouTube' in driver.title
             print('✓ Test passed!')
+        finally:
             driver.quit()
-        except Exception as e:
-            print('✗ Test failed:', str(e))
-            if 'driver' in locals(): driver.quit()
-            raise
         "
