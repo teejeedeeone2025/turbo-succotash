@@ -34,14 +34,18 @@ jobs:
         wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
         sudo apt install -y ./google-chrome-stable_current_amd64.deb
         
-        # Install Chromedriver (corrected extraction path)
+        # Install Chromedriver (correct method)
         wget https://storage.googleapis.com/chrome-for-testing-public/139.0.7258.68/linux64/chromedriver-linux64.zip
-        sudo unzip -j chromedriver-linux64.zip chromedriver -d /usr/local/bin/
+        sudo mkdir -p /usr/local/share/chromedriver
+        sudo unzip chromedriver-linux64.zip -d /usr/local/share/chromedriver
+        sudo mv /usr/local/share/chromedriver/chromedriver-linux64/chromedriver /usr/local/bin/
         sudo chmod +x /usr/local/bin/chromedriver
+        sudo ln -s /usr/local/bin/chromedriver /usr/bin/chromedriver
         
-        # Verify versions
+        # Verify installation
         echo "Chrome version: $(google-chrome --version)"
         echo "Chromedriver version: $(chromedriver --version)"
+        echo "Chromedriver path: $(which chromedriver)"
 
     - name: Run Selenium Test
       run: |
