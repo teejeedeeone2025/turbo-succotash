@@ -1,116 +1,179 @@
+import os
+import sys
+import zipfile
+import requests
+import shutil
+import time
+import logging
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
 from webdriver_manager.chrome import ChromeDriverManager
-import os
-import zipfile
-import requests
-import smtplib
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
-from email.mime.image import MIMEImage
-import time
-import shutil
 
-# Email settings
-SENDER_EMAIL = "tajuttech360@gmail.com"
-RECIPIENT_EMAILS = ["teejeedeeone@gmail.com"]
-EMAIL_PASSWORD = "clda nqsc scnj kpfd"
-SMTP_SERVER = "smtp.gmail.com"
-SMTP_PORT = 587
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler(sys.stdout),
+        logging.FileHandler('script.log')
+    ]
+)
 
-# GitHub profile settings
-PROFILE_ZIP_URL = "https://github.com/teejeedeeone2025/turbo-succotash/raw/master/ChromeProfile_ultra.zip"
-PROFILE_DIR = os.path.expanduser("~/chrome_profile")
-PROFILE_EXTRACTED_DIR = os.path.join(PROFILE_DIR, "ChromeProfile")
+# Configuration
+CONFIG = {
+    'profile': {
+        'zip_url': "https://github.com/teejeedeeone2025/turbo-succotash/raw/master/ChromeProfile_ultra.zip",
+        'extract_dir': os.path.expanduser("~/chrome_profile"),
+        'profile_name': "Profile 1"
+    },
+    'chrome': {
+        'headless': True,
+        'window_size': "1920,1080"
+    }
+}
 
-def convert_windows_to_linux_profile(profile_path):
-    """Convert Windows Chrome profile to work on Linux"""
+def setup_environment():
+    """Set up the environment for Chrome to run"""
     try:
-        # Fix preferences file
-        prefs_file = os.path.join(profile_path, "Preferences")
-        if os.path.exists(prefs_file):
-            with open(prefs_file, 'r+', encoding='utf-8') as f:
-                content = f.read()
-                # Replace Windows paths with Linux paths
-                content = content.replace(r'C:\\Users\\', '/home/runner/')
-                content = content.replace('\\\\', '/')
-                f.seek(0)
-                f.write(content)
-                f.truncate()
+        # Install required system packages
+        os.system('sudo apt-get update')
+        os.system('sudo apt-get install -y wget unzip libxss1 libappindicator1 libindicator7')
+        os.system('wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb')
+        os.system('sudo apt install -y ./google-chrome-stable_current_amd64.deb')
+        os.system('sudo apt --fix-broken install -y')
         
-        # Remove problematic files
-        for file in ["SingletonCookie", "SingletonLock", "SingletonSocket"]:
-            file_path = os.path.join(profile_path, file)
-            if os.path.exists(file_path):
-                os.remove(file_path)
+        # Verify Chrome installation
+        chrome_version = os.popen('google-chrome --version').read().strip()
+        logging.info(f"Chrome version: {chrome_version}")
         
         return True
     except Exception as e:
-        print(f"Profile conversion failed: {e}")
+        logging.error(f"Environment setup failed: {str(e)}")
         return False
 
-def download_and_extract_profile():
-    """Download and extract Chrome profile from GitHub"""
+def download_profile():
+    """Download and extract the Chrome profile"""
     try:
-        if os.path.exists(PROFILE_DIR):
-            shutil.rmtree(PROFILE_DIR)
-        os.makedirs(PROFILE_DIR, exist_ok=True)
+        profile_dir = CONFIG['profile']['extract_dir']
         
-        print("Downloading Chrome profile...")
-        headers = {'User-Agent': 'Mozilla/5.0'}
-        response = requests.get(PROFILE_ZIP_URL, headers=headers, stream=True)
+        # Clean up existing profile if it exists
+        if os.path.exists(profile_dir):
+            shutil.rmtree(profile_dir)
+        os.makedirs(profile_dir, exist_ok=True)
+        
+        # Download profile
+        logging.info("Downloading Chrome profile...")
+        zip_path = os.path.join(profile_dir, "profile.zip")
+        
+        response = requests.get(
+            CONFIG['profile']['zip_url'],
+            stream=True,
+            headers={'User-Agent': 'Mozilla/5.0'}
+        )
         response.raise_for_status()
         
-        zip_path = os.path.join(PROFILE_DIR, "profile.zip")
         with open(zip_path, 'wb') as f:
             for chunk in response.iter_content(chunk_size=8192):
                 if chunk:
                     f.write(chunk)
         
-        if not zipfile.is_zipfile(zip_path):
-            raise ValueError("Downloaded file is not a valid zip file")
-        
-        print("Extracting Chrome profile...")
+        # Extract profile
+        logging.info("Extracting profile...")
         with zipfile.ZipFile(zip_path, 'r') as zip_ref:
-            zip_ref.extractall(PROFILE_DIR)
+            zip_ref.extractall(profile_dir)
         
-        # Convert Windows profile to Linux-compatible
-        profile_path = os.path.join(PROFILE_EXTRACTED_DIR, "Profile 1")
-        if not convert_windows_to_linux_profile(profile_path):
-            raise RuntimeError("Failed to convert Windows profile to Linux format")
+        # Verify extraction
+        profile_path = os.path.join(profile_dir, CONFIG['profile']['profile_name'])
+        if not os.path.exists(profile_path):
+            raise FileNotFoundError(f"Profile directory not found at {profile_path}")
         
-        print("Profile successfully prepared for Linux")
+        logging.info(f"Profile successfully extracted to {profile_path}")
         return True
         
     except Exception as e:
-        print(f"Profile setup failed: {str(e)}")
-        if os.path.exists(PROFILE_DIR):
-            shutil.rmtree(PROFILE_DIR)
+        logging.error(f"Failed to setup profile: {str(e)}")
+        if os.path.exists(profile_dir):
+            shutil.rmtree(profile_dir)
         return False
 
-# [Rest of your functions remain the same...]
+def create_driver():
+    """Create and configure Chrome WebDriver"""
+    try:
+        options = Options()
+        
+        # Profile configuration
+        profile_path = os.path.join(
+            CONFIG['profile']['extract_dir'],
+            CONFIG['profile']['profile_name']
+        )
+        options.add_argument(f"--user-data-dir={CONFIG['profile']['extract_dir']}")
+        options.add_argument(f"--profile-directory={CONFIG['profile']['profile_name']}")
+        
+        # Chrome options
+        if CONFIG['chrome']['headless']:
+            options.add_argument("--headless=new")
+        options.add_argument(f"--window-size={CONFIG['chrome']['window_size']}")
+        options.add_argument("--no-sandbox")
+        options.add_argument("--disable-dev-shm-usage")
+        options.add_argument("--disable-gpu")
+        options.add_argument("--remote-debugging-port=9222")
+        
+        # Initialize driver
+        service = Service(ChromeDriverManager().install())
+        driver = webdriver.Chrome(service=service, options=options)
+        driver.set_page_load_timeout(30)
+        
+        logging.info("Chrome WebDriver successfully created")
+        return driver
+        
+    except Exception as e:
+        logging.error(f"Failed to create WebDriver: {str(e)}")
+        return None
 
-def setup_chrome_options():
-    """Configure Chrome options with profile"""
-    options = Options()
-    
-    # Profile configuration
-    options.add_argument(f"--user-data-dir={PROFILE_EXTRACTED_DIR}")
-    options.add_argument("--profile-directory=Profile 1")
-    
-    # Critical options for GitHub Actions
-    options.add_argument("--headless=new")
-    options.add_argument("--no-sandbox")
-    options.add_argument("--disable-dev-shm-usage")
-    options.add_argument("--disable-gpu")
-    options.add_argument("--remote-debugging-port=9222")
-    
-    # Additional stability options
-    options.add_argument("--window-size=1920x1080")
-    options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
-    options.add_experimental_option('excludeSwitches', ['enable-logging'])
-    
-    return options
+def main():
+    """Main execution function"""
+    try:
+        # Setup environment
+        if not setup_environment():
+            raise RuntimeError("Environment setup failed")
+        
+        # Download profile
+        if not download_profile():
+            raise RuntimeError("Profile setup failed")
+        
+        # Create driver
+        driver = create_driver()
+        if not driver:
+            raise RuntimeError("WebDriver creation failed")
+        
+        try:
+            # Test navigation
+            logging.info("Navigating to YouTube...")
+            driver.get("https://www.youtube.com")
+            
+            # Verify page
+            logging.info(f"Page title: {driver.title}")
+            if 'YouTube' not in driver.title:
+                raise AssertionError("YouTube not found in page title")
+            
+            # Take screenshot
+            screenshot_path = 'youtube_screenshot.png'
+            driver.save_screenshot(screenshot_path)
+            logging.info(f"Screenshot saved to {screenshot_path}")
+            
+            # Keep browser open for debugging (headless will still close)
+            time.sleep(5)
+            
+        finally:
+            driver.quit()
+            
+        logging.info("Script completed successfully")
+        return 0
+        
+    except Exception as e:
+        logging.error(f"Script failed: {str(e)}")
+        return 1
 
-# [Rest of your script remains the same...]
+if __name__ == "__main__":
+    sys.exit(main())
