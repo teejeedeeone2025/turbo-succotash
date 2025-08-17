@@ -1,10 +1,12 @@
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.chrome.service import Service
 import os
 import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.mime.image import MIMEImage
+import time
 
 # Email settings
 SENDER_EMAIL = "dahmadu071@gmail.com"
@@ -45,25 +47,37 @@ def send_email_with_screenshot(screenshot_path):
 def main():
     options = Options()
     
-    # Profile configuration
-    options.add_argument('--user-data-dir=' + os.path.expanduser('~/.config/google-chrome'))
-    options.add_argument('--profile-directory=Profile 1')  # Note: Fixed typo from 'directoy' to 'directory'
-    
-    # Chrome configuration
-    options.add_argument('--headless=new')  # Using the new headless mode
+    # Updated Chrome configuration
     options.add_argument('--no-sandbox')
     options.add_argument('--disable-dev-shm-usage')
     options.add_argument('--disable-gpu')
     options.add_argument('--window-size=1920x1080')
     options.add_argument('user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
-
-    driver = webdriver.Chrome(options=options)
     
+    # Headless configuration - try both old and new methods
+    options.add_argument('--headless=new')  # New headless mode
+    options.add_argument('--remote-debugging-port=9222')  # Helps prevent DevToolsActivePort error
+    
+    # Remove profile configuration if running in CI environment
+    if not os.getenv('CI'):
+        options.add_argument('--user-data-dir=' + os.path.expanduser('~/.config/google-chrome'))
+        options.add_argument('--profile-directory=Profile 1')
+
     try:
+        # Initialize Chrome WebDriver
+        service = Service(executable_path='/usr/local/bin/chromedriver')  # Adjust path if needed
+        driver = webdriver.Chrome(service=service, options=options)
+        
+        # Add delay to ensure page loads
+        driver.implicitly_wait(10)
+        
         # Test code
         driver.get("https://www.youtube.com")
         print("Page title:", driver.title)
         assert 'YouTube' in driver.title
+        
+        # Add small delay before screenshot
+        time.sleep(2)
         
         # Save screenshot
         screenshot_path = 'result.png'
@@ -78,7 +92,8 @@ def main():
     except Exception as e:
         print(f"An error occurred: {e}")
     finally:
-        driver.quit()
+        if 'driver' in locals():
+            driver.quit()
 
 if __name__ == "__main__":
     main()
