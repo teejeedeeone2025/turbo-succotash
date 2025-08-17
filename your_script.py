@@ -13,9 +13,9 @@ import time
 import shutil
 
 # Email settings
-SENDER_EMAIL = "dahmadu071@gmail.com"
+SENDER_EMAIL = "tajuttech360@gmail.com"
 RECIPIENT_EMAILS = ["teejeedeeone@gmail.com"]
-EMAIL_PASSWORD = "oase wivf hvqn lyhr"
+EMAIL_PASSWORD = "clda nqsc scnj kpfd"
 SMTP_SERVER = "smtp.gmail.com"
 SMTP_PORT = 587
 
