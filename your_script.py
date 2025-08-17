@@ -10,144 +10,107 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.mime.image import MIMEImage
 import time
+import shutil
 
 # Email settings
-SENDER_EMAIL = "tajuttech360@gmail.com"
+SENDER_EMAIL = "dahmadu071@gmail.com"
 RECIPIENT_EMAILS = ["teejeedeeone@gmail.com"]
-EMAIL_PASSWORD = "clda nqsc scnj kpfd"
+EMAIL_PASSWORD = "oase wivf hvqn lyhr"
 SMTP_SERVER = "smtp.gmail.com"
 SMTP_PORT = 587
 
-# GitHub profile settings - USING RAW CONTENT URL
+# GitHub profile settings
 PROFILE_ZIP_URL = "https://github.com/teejeedeeone2025/turbo-succotash/raw/master/ChromeProfile_ultra.zip"
 PROFILE_DIR = os.path.expanduser("~/chrome_profile")
 PROFILE_EXTRACTED_DIR = os.path.join(PROFILE_DIR, "ChromeProfile")
 
+def convert_windows_to_linux_profile(profile_path):
+    """Convert Windows Chrome profile to work on Linux"""
+    try:
+        # Fix preferences file
+        prefs_file = os.path.join(profile_path, "Preferences")
+        if os.path.exists(prefs_file):
+            with open(prefs_file, 'r+', encoding='utf-8') as f:
+                content = f.read()
+                # Replace Windows paths with Linux paths
+                content = content.replace(r'C:\\Users\\', '/home/runner/')
+                content = content.replace('\\\\', '/')
+                f.seek(0)
+                f.write(content)
+                f.truncate()
+        
+        # Remove problematic files
+        for file in ["SingletonCookie", "SingletonLock", "SingletonSocket"]:
+            file_path = os.path.join(profile_path, file)
+            if os.path.exists(file_path):
+                os.remove(file_path)
+        
+        return True
+    except Exception as e:
+        print(f"Profile conversion failed: {e}")
+        return False
+
 def download_and_extract_profile():
     """Download and extract Chrome profile from GitHub"""
     try:
+        if os.path.exists(PROFILE_DIR):
+            shutil.rmtree(PROFILE_DIR)
         os.makedirs(PROFILE_DIR, exist_ok=True)
         
-        # Download the profile zip
         print("Downloading Chrome profile...")
         headers = {'User-Agent': 'Mozilla/5.0'}
         response = requests.get(PROFILE_ZIP_URL, headers=headers, stream=True)
-        response.raise_for_status()  # Raise error for bad status codes
+        response.raise_for_status()
         
         zip_path = os.path.join(PROFILE_DIR, "profile.zip")
-        
         with open(zip_path, 'wb') as f:
             for chunk in response.iter_content(chunk_size=8192):
-                if chunk:  # filter out keep-alive chunks
+                if chunk:
                     f.write(chunk)
         
-        # Verify it's a valid zip file
         if not zipfile.is_zipfile(zip_path):
             raise ValueError("Downloaded file is not a valid zip file")
         
-        # Extract the profile
         print("Extracting Chrome profile...")
         with zipfile.ZipFile(zip_path, 'r') as zip_ref:
             zip_ref.extractall(PROFILE_DIR)
         
-        # Verify extraction
-        if not os.path.exists(os.path.join(PROFILE_EXTRACTED_DIR, "Profile 1")):
-            raise FileNotFoundError("Profile 1 directory not found in extracted files")
+        # Convert Windows profile to Linux-compatible
+        profile_path = os.path.join(PROFILE_EXTRACTED_DIR, "Profile 1")
+        if not convert_windows_to_linux_profile(profile_path):
+            raise RuntimeError("Failed to convert Windows profile to Linux format")
         
-        print(f"Profile successfully extracted to: {PROFILE_EXTRACTED_DIR}")
+        print("Profile successfully prepared for Linux")
         return True
         
     except Exception as e:
-        print(f"Failed to download/extract profile: {str(e)}")
-        # Clean up if something went wrong
-        if 'zip_path' in locals() and os.path.exists(zip_path):
-            os.remove(zip_path)
+        print(f"Profile setup failed: {str(e)}")
+        if os.path.exists(PROFILE_DIR):
+            shutil.rmtree(PROFILE_DIR)
         return False
 
-def send_email_with_screenshot(screenshot_path):
-    """Send an email with the screenshot attachment"""
-    try:
-        msg = MIMEMultipart()
-        msg['From'] = SENDER_EMAIL
-        msg['To'] = ", ".join(RECIPIENT_EMAILS)
-        msg['Subject'] = "YouTube Screenshot Result"
-        
-        body = "Here's the screenshot of YouTube as requested."
-        msg.attach(MIMEText(body, 'plain'))
-        
-        with open(screenshot_path, 'rb') as f:
-            img = MIMEImage(f.read())
-            img.add_header('Content-Disposition', 'attachment', filename=os.path.basename(screenshot_path))
-            msg.attach(img)
-        
-        with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
-            server.starttls()
-            server.login(SENDER_EMAIL, EMAIL_PASSWORD)
-            server.sendmail(SENDER_EMAIL, RECIPIENT_EMAILS, msg.as_string())
-        
-        print("Email sent successfully!")
-    except Exception as e:
-        print(f"Failed to send email: {e}")
+# [Rest of your functions remain the same...]
 
 def setup_chrome_options():
     """Configure Chrome options with profile"""
     options = Options()
     
-    # Profile configuration (Linux paths)
+    # Profile configuration
     options.add_argument(f"--user-data-dir={PROFILE_EXTRACTED_DIR}")
     options.add_argument("--profile-directory=Profile 1")
     
-    # Headless and stability options
+    # Critical options for GitHub Actions
     options.add_argument("--headless=new")
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
     options.add_argument("--disable-gpu")
+    options.add_argument("--remote-debugging-port=9222")
+    
+    # Additional stability options
     options.add_argument("--window-size=1920x1080")
     options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
-    options.add_argument("--disable-webgl")
-    options.add_argument("--disable-software-rasterizer")
-    options.add_argument("--log-level=3")
     options.add_experimental_option('excludeSwitches', ['enable-logging'])
     
     return options
 
-def main():
-    # Download and extract the Chrome profile first
-    if not download_and_extract_profile():
-        print("Failed to setup Chrome profile, exiting...")
-        return
-    
-    # Setup Chrome options
-    options = setup_chrome_options()
-    
-    try:
-        # Initialize Chrome WebDriver
-        service = Service(ChromeDriverManager().install())
-        driver = webdriver.Chrome(service=service, options=options)
-        driver.set_page_load_timeout(30)
-        
-        # Test code
-        print("Navigating to YouTube...")
-        driver.get("https://www.youtube.com")
-        print("Page title:", driver.title)
-        assert 'YouTube' in driver.title
-        
-        # Take screenshot
-        time.sleep(2)
-        screenshot_path = 'result.png'
-        driver.save_screenshot(screenshot_path)
-        print(f"Screenshot saved to {screenshot_path}")
-        
-        # Send email with screenshot
-        send_email_with_screenshot(screenshot_path)
-        
-    except AssertionError:
-        print("YouTube not found in page title!")
-    except Exception as e:
-        print(f"An error occurred: {e}")
-    finally:
-        if 'driver' in locals():
-            driver.quit()
-
-if __name__ == "__main__":
-    main()
+# [Rest of your script remains the same...]
