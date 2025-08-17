@@ -18,8 +18,8 @@ EMAIL_PASSWORD = "oase wivf hvqn lyhr"
 SMTP_SERVER = "smtp.gmail.com"
 SMTP_PORT = 587
 
-# GitHub profile settings
-PROFILE_ZIP_URL = "https://github.com/teejeedeeone2025/turbo-succotash/blob/master/ChromeProfile_ultra.zip"
+# GitHub profile settings - USING RAW CONTENT URL
+PROFILE_ZIP_URL = "https://github.com/teejeedeeone2025/turbo-succotash/raw/master/ChromeProfile_ultra.zip"
 PROFILE_DIR = os.path.expanduser("~/chrome_profile")
 PROFILE_EXTRACTED_DIR = os.path.join(PROFILE_DIR, "ChromeProfile")
 
@@ -30,22 +30,38 @@ def download_and_extract_profile():
         
         # Download the profile zip
         print("Downloading Chrome profile...")
-        response = requests.get(PROFILE_ZIP_URL, stream=True)
+        headers = {'User-Agent': 'Mozilla/5.0'}
+        response = requests.get(PROFILE_ZIP_URL, headers=headers, stream=True)
+        response.raise_for_status()  # Raise error for bad status codes
+        
         zip_path = os.path.join(PROFILE_DIR, "profile.zip")
         
         with open(zip_path, 'wb') as f:
             for chunk in response.iter_content(chunk_size=8192):
-                f.write(chunk)
+                if chunk:  # filter out keep-alive chunks
+                    f.write(chunk)
+        
+        # Verify it's a valid zip file
+        if not zipfile.is_zipfile(zip_path):
+            raise ValueError("Downloaded file is not a valid zip file")
         
         # Extract the profile
         print("Extracting Chrome profile...")
         with zipfile.ZipFile(zip_path, 'r') as zip_ref:
             zip_ref.extractall(PROFILE_DIR)
         
-        print(f"Profile extracted to: {PROFILE_EXTRACTED_DIR}")
+        # Verify extraction
+        if not os.path.exists(os.path.join(PROFILE_EXTRACTED_DIR, "Profile 1")):
+            raise FileNotFoundError("Profile 1 directory not found in extracted files")
+        
+        print(f"Profile successfully extracted to: {PROFILE_EXTRACTED_DIR}")
         return True
+        
     except Exception as e:
-        print(f"Failed to download/extract profile: {e}")
+        print(f"Failed to download/extract profile: {str(e)}")
+        # Clean up if something went wrong
+        if 'zip_path' in locals() and os.path.exists(zip_path):
+            os.remove(zip_path)
         return False
 
 def send_email_with_screenshot(screenshot_path):
@@ -88,8 +104,6 @@ def setup_chrome_options():
     options.add_argument("--disable-gpu")
     options.add_argument("--window-size=1920x1080")
     options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
-    
-    # Additional stability options from your Windows version
     options.add_argument("--disable-webgl")
     options.add_argument("--disable-software-rasterizer")
     options.add_argument("--log-level=3")
