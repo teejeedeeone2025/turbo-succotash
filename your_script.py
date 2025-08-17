@@ -1,6 +1,7 @@
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
+from webdriver_manager.chrome import ChromeDriverManager
 import os
 import smtplib
 from email.mime.multipart import MIMEMultipart
@@ -18,23 +19,19 @@ SMTP_PORT = 587
 def send_email_with_screenshot(screenshot_path):
     """Send an email with the screenshot attachment"""
     try:
-        # Create message container
         msg = MIMEMultipart()
         msg['From'] = SENDER_EMAIL
         msg['To'] = ", ".join(RECIPIENT_EMAILS)
         msg['Subject'] = "YouTube Screenshot Result"
         
-        # Add body text
         body = "Here's the screenshot of YouTube as requested."
         msg.attach(MIMEText(body, 'plain'))
         
-        # Attach screenshot
         with open(screenshot_path, 'rb') as f:
             img = MIMEImage(f.read())
             img.add_header('Content-Disposition', 'attachment', filename=os.path.basename(screenshot_path))
             msg.attach(img)
         
-        # Send email
         with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
             server.starttls()
             server.login(SENDER_EMAIL, EMAIL_PASSWORD)
@@ -47,44 +44,30 @@ def send_email_with_screenshot(screenshot_path):
 def main():
     options = Options()
     
-    # Updated Chrome configuration
+    # Chrome configuration
     options.add_argument('--no-sandbox')
     options.add_argument('--disable-dev-shm-usage')
     options.add_argument('--disable-gpu')
     options.add_argument('--window-size=1920x1080')
     options.add_argument('user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
-    
-    # Headless configuration - try both old and new methods
-    options.add_argument('--headless=new')  # New headless mode
-    options.add_argument('--remote-debugging-port=9222')  # Helps prevent DevToolsActivePort error
-    
-    # Remove profile configuration if running in CI environment
-    if not os.getenv('CI'):
-        options.add_argument('--user-data-dir=' + os.path.expanduser('~/.config/google-chrome'))
-        options.add_argument('--profile-directory=Profile 1')
+    options.add_argument('--headless=new')
+    options.add_argument('--remote-debugging-port=9222')
 
     try:
-        # Initialize Chrome WebDriver
-        service = Service(executable_path='/usr/local/bin/chromedriver')  # Adjust path if needed
+        # Automatically download and install ChromeDriver
+        service = Service(ChromeDriverManager().install())
         driver = webdriver.Chrome(service=service, options=options)
         
-        # Add delay to ensure page loads
         driver.implicitly_wait(10)
-        
-        # Test code
         driver.get("https://www.youtube.com")
         print("Page title:", driver.title)
         assert 'YouTube' in driver.title
         
-        # Add small delay before screenshot
         time.sleep(2)
-        
-        # Save screenshot
         screenshot_path = 'result.png'
         driver.save_screenshot(screenshot_path)
         print(f"Screenshot saved to {screenshot_path}")
         
-        # Send email with screenshot
         send_email_with_screenshot(screenshot_path)
         
     except AssertionError:
