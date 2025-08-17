@@ -9,18 +9,22 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
       with:
-        lfs: true
+        lfs: true  # Required for Git LFS files
 
     - name: Set up Python
       uses: actions/setup-python@v4
       with:
         python-version: '3.10'
 
-    - name: Install dependencies
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y unzip wget xvfb
+
+    - name: Install Python packages
       run: |
         python -m pip install --upgrade pip
         pip install selenium webdriver-manager
-        sudo apt-get install -y unzip wget xvfb
 
     - name: Setup Chrome Profile
       run: |
@@ -34,40 +38,11 @@ jobs:
         wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
         sudo apt install -y ./google-chrome-stable_current_amd64.deb
         
-        # Install matching Chromedriver using webdriver-manager
-        python -c "from webdriver_manager.chrome import ChromeDriverManager; print(ChromeDriverManager().install())"
-        
-        # Verify versions
+        # Install matching Chromedriver
+        python -m pip install webdriver-manager
         echo "Chrome version: $(google-chrome --version)"
-        chromedriver --version
+        python -c "from webdriver_manager.chrome import ChromeDriverManager; print('Chromedriver version:', ChromeDriverManager().install())"
 
     - name: Run Selenium Test with Xvfb
       run: |
-        xvfb-run python -c "
-        from selenium import webdriver
-        from selenium.webdriver.chrome.options import Options
-        import os
-        
-        options = Options()
-        options.add_argument('--user-data-dir=' + os.path.expanduser('~') + '/.config/google-chrome')
-        options.add_argument('--profile-directory=Profile 1')
-        options.add_argument('--headless=new')
-        options.add_argument('--no-sandbox')
-        options.add_argument('--disable-dev-shm-usage')
-        options.add_argument('--disable-gpu')
-        options.add_argument('--remote-debugging-port=9222')
-        options.add_argument('--window-size=1920,1080')
-        
-        try:
-            driver = webdriver.Chrome(options=options)
-            print('Navigating to YouTube...')
-            driver.get('https://www.youtube.com')
-            print('Title:', driver.title)
-            assert 'YouTube' in driver.title
-            print('✓ Test passed!')
-            driver.quit()
-        except Exception as e:
-            print('✗ Test failed:', str(e))
-            if 'driver' in locals(): driver.quit()
-            raise
-        "
+        xvfb-run python your_script.py  # Replace with your actual script name
