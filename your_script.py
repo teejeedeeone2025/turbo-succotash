@@ -10,14 +10,16 @@ def main():
     options.add_argument('--profile-directory=Profile 1')
     
     # Your existing config
-    options.add_argument('--headless=new')
+   # Configure Chrome options
+    options = Options()
+    options.add_argument('--headless')
     options.add_argument('--no-sandbox')
     options.add_argument('--disable-dev-shm-usage')
     options.add_argument('--disable-gpu')
     options.add_argument('--window-size=1920x1080')
     options.add_argument('user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
-
-    driver = webdriver.Chrome(options=options)
+    
+    return webdriver.Chrome(options=options)
     try:
         # Your test code here
         driver.get("https://www.youtube.com")
