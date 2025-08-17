@@ -6,10 +6,6 @@ import requests
 import shutil
 import time
 import logging
-import smtplib
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
-from email.mime.image import MIMEImage
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
@@ -17,7 +13,7 @@ from webdriver_manager.chrome import ChromeDriverManager
 
 # Configure logging
 logging.basicConfig(
-    level=logging.INFO,
+    level=logging.DEBUG,  # Changed to DEBUG for more detailed logs
     format='%(asctime)s - %(levelname)s - %(message)s',
     handlers=[
         logging.StreamHandler(sys.stdout),
@@ -29,62 +25,38 @@ CONFIG = {
     'profile': {
         'zip_url': "https://github.com/teejeedeeone2025/turbo-succotash/raw/master/ChromeProfile_ultra.zip",
         'extract_dir': os.path.expanduser("~/chrome_profile"),
-        'profile_name': "Profile 1"
+        'profile_name': None  # Will be auto-detected
     },
     'chrome': {
         'headless': True,
         'window_size': "1920,1080",
         'user_agent': "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-    },
-    'email': {
-        'sender': "tajuttech360@gmail.com",
-        'recipients': ["teejeedeeone@gmail.com"],
-        'password': "clda nqsc scnj kpfd",
-        'smtp_server': "smtp.gmail.com",
-        'smtp_port': 587
     }
 }
 
-def convert_windows_profile_to_linux(profile_path):
-    """Convert Windows Chrome profile to work on Linux"""
-    try:
-        # 1. Fix Preferences file
-        prefs_file = os.path.join(profile_path, "Preferences")
-        if os.path.exists(prefs_file):
-            with open(prefs_file, 'r+', encoding='utf-8') as f:
-                prefs = json.load(f)
-                # Convert Windows paths to Linux
-                for key in ['profile', 'extensions']:
-                    if key in prefs:
-                        if 'last_active_profiles' in prefs[key]:
-                            prefs[key]['last_active_profiles'] = ["Profile 1"]
-                        if 'content_settings' in prefs[key]:
-                            for origin in list(prefs[key]['content_settings'].get('exceptions', {}).keys()):
-                                if 'C:\\' in origin:
-                                    del prefs[key]['content_settings']['exceptions'][origin]
-                f.seek(0)
-                json.dump(prefs, f, indent=2)
-                f.truncate()
-
-        # 2. Clean up Windows-specific files
-        for file in ['SingletonCookie', 'SingletonLock', 'SingletonSocket']:
-            file_path = os.path.join(profile_path, file)
-            if os.path.exists(file_path):
-                os.remove(file_path)
-
-        # 3. Fix Cookies database (if exists)
-        cookies_db = os.path.join(profile_path, "Cookies")
-        if os.path.exists(cookies_db):
-            os.remove(cookies_db)  # Chrome will recreate this
-
-        logging.info("Successfully converted Windows profile to Linux")
-        return True
-    except Exception as e:
-        logging.error(f"Profile conversion failed: {e}")
-        return False
+def analyze_zip_structure(zip_path):
+    """Analyze the zip file structure and detect profile directory"""
+    with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+        file_list = zip_ref.namelist()
+        logging.debug(f"Zip contents: {file_list}")
+        
+        # Look for common profile directory patterns
+        possible_profiles = [
+            name.split('/')[0] 
+            for name in file_list 
+            if any(x in name.lower() for x in ['profile', 'default', 'user data'])
+        ]
+        
+        if not possible_profiles:
+            raise ValueError("No recognizable profile directory found in zip")
+        
+        # Get the most likely profile directory
+        profile_dir = max(set(possible_profiles), key=possible_profiles.count)
+        logging.info(f"Detected profile directory: {profile_dir}")
+        return profile_dir
 
 def download_and_prepare_profile():
-    """Download and prepare Chrome profile"""
+    """Download and prepare Chrome profile with better structure detection"""
     try:
         profile_dir = CONFIG['profile']['extract_dir']
         
@@ -109,108 +81,83 @@ def download_and_prepare_profile():
                 if chunk:
                     f.write(chunk)
 
+        # Detect profile structure
+        CONFIG['profile']['profile_name'] = analyze_zip_structure(zip_path)
+        
         # Extract profile
-        logging.info("Extracting profile...")
+        logging.info(f"Extracting profile to {profile_dir}...")
         with zipfile.ZipFile(zip_path, 'r') as zip_ref:
             zip_ref.extractall(profile_dir)
 
-        # Convert Windows profile to Linux
+        # Verify extraction
         profile_path = os.path.join(profile_dir, CONFIG['profile']['profile_name'])
         if not os.path.exists(profile_path):
             raise FileNotFoundError(f"Profile directory not found at {profile_path}")
         
-        if not convert_windows_profile_to_linux(profile_path):
-            raise RuntimeError("Profile conversion failed")
-
-        logging.info(f"Profile ready at: {profile_path}")
+        logging.info(f"Profile successfully prepared at: {profile_path}")
         return True
 
     except Exception as e:
-        logging.error(f"Profile preparation failed: {e}")
+        logging.error(f"Profile preparation failed: {str(e)}")
         if os.path.exists(profile_dir):
             shutil.rmtree(profile_dir)
         return False
 
-def send_email_with_screenshot(screenshot_path):
-    """Send email with screenshot attachment"""
+def create_driver():
+    """Create Chrome WebDriver with the prepared profile"""
     try:
-        msg = MIMEMultipart()
-        msg['From'] = CONFIG['email']['sender']
-        msg['To'] = ", ".join(CONFIG['email']['recipients'])
-        msg['Subject'] = "YouTube Automation Result"
+        options = Options()
         
-        body = f"""
-        <html>
-            <body>
-                <h2>YouTube Automation Report</h2>
-                <p>Screenshot attached from automated browser session.</p>
-                <p>Page title: {driver.title if 'driver' in locals() else 'N/A'}</p>
-            </body>
-        </html>
-        """
-        msg.attach(MIMEText(body, 'html'))
+        # Profile configuration
+        options.add_argument(f"--user-data-dir={CONFIG['profile']['extract_dir']}")
+        options.add_argument(f"--profile-directory={CONFIG['profile']['profile_name']}")
         
-        with open(screenshot_path, 'rb') as f:
-            img = MIMEImage(f.read())
-            img.add_header('Content-Disposition', 'attachment', filename="youtube_screenshot.png")
-            msg.attach(img)
+        # Chrome options
+        options.add_argument("--headless=new")
+        options.add_argument("--no-sandbox")
+        options.add_argument("--disable-dev-shm-usage")
+        options.add_argument(f"--window-size={CONFIG['chrome']['window_size']}")
+        options.add_argument(f"--user-agent={CONFIG['chrome']['user_agent']}")
         
-        with smtplib.SMTP(CONFIG['email']['smtp_server'], CONFIG['email']['smtp_port']) as server:
-            server.starttls()
-            server.login(CONFIG['email']['sender'], CONFIG['email']['password'])
-            server.send_message(msg)
+        # Initialize driver
+        logging.info("Initializing Chrome WebDriver...")
+        service = Service(ChromeDriverManager().install())
+        driver = webdriver.Chrome(service=service, options=options)
+        driver.set_page_load_timeout(30)
         
-        logging.info("Email sent successfully!")
-        return True
+        logging.info("WebDriver successfully created")
+        return driver
+        
     except Exception as e:
-        logging.error(f"Failed to send email: {e}")
-        return False
-
-def setup_chrome_driver():
-    """Configure and return Chrome WebDriver"""
-    options = Options()
-    
-    # Profile settings
-    options.add_argument(f"--user-data-dir={CONFIG['profile']['extract_dir']}")
-    options.add_argument(f"--profile-directory={CONFIG['profile']['profile_name']}")
-    
-    # Chrome options
-    options.add_argument("--headless=new")
-    options.add_argument("--no-sandbox")
-    options.add_argument("--disable-dev-shm-usage")
-    options.add_argument(f"--window-size={CONFIG['chrome']['window_size']}")
-    options.add_argument(f"--user-agent={CONFIG['chrome']['user_agent']}")
-    
-    # Initialize driver
-    service = Service(ChromeDriverManager().install())
-    driver = webdriver.Chrome(service=service, options=options)
-    driver.set_page_load_timeout(30)
-    
-    return driver
+        logging.error(f"Failed to create WebDriver: {str(e)}")
+        return None
 
 def main():
+    """Main execution function"""
     try:
-        # Setup profile
+        # Prepare profile
         if not download_and_prepare_profile():
             raise RuntimeError("Failed to prepare Chrome profile")
         
-        # Initialize browser
-        driver = setup_chrome_driver()
-        logging.info("Chrome WebDriver initialized")
+        # Create driver
+        driver = create_driver()
+        if not driver:
+            raise RuntimeError("WebDriver creation failed")
         
         try:
-            # Navigate to YouTube
+            # Test navigation
+            logging.info("Navigating to YouTube...")
             driver.get("https://www.youtube.com")
+            
+            # Verify page
             logging.info(f"Page title: {driver.title}")
+            if 'YouTube' not in driver.title:
+                raise AssertionError("YouTube not found in page title")
             
             # Take screenshot
-            screenshot_path = "youtube_screenshot.png"
+            screenshot_path = 'youtube_screenshot.png'
             driver.save_screenshot(screenshot_path)
             logging.info(f"Screenshot saved to {screenshot_path}")
-            
-            # Send email
-            if not send_email_with_screenshot(screenshot_path):
-                raise RuntimeError("Failed to send results email")
             
             return 0
             
@@ -218,7 +165,7 @@ def main():
             driver.quit()
             
     except Exception as e:
-        logging.error(f"Script failed: {e}")
+        logging.error(f"Script failed: {str(e)}")
         return 1
 
 if __name__ == "__main__":
