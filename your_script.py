@@ -5,6 +5,10 @@ import requests
 import shutil
 import time
 import logging
+import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from email.mime.image import MIMEImage
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
@@ -31,8 +35,62 @@ CONFIG = {
         'headless': True,
         'window_size': "1920,1080",
         'user_agent': "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+    },
+    'email': {
+        'sender': "tajuttech360@gmail.com",
+        'recipients': ["teejeedeeone@gmail.com"],
+        'password': "clda nqsc scnj kpfd",
+        'smtp_server': "smtp.gmail.com",
+        'smtp_port': 587
     }
 }
+
+def send_email_with_screenshot(screenshot_path):
+    """Send an email with the screenshot attachment"""
+    try:
+        logging.info("Preparing to send email...")
+        
+        # Create message container
+        msg = MIMEMultipart()
+        msg['From'] = CONFIG['email']['sender']
+        msg['To'] = ", ".join(CONFIG['email']['recipients'])
+        msg['Subject'] = "YouTube Automation Screenshot"
+        
+        # Add body text
+        body = """
+        <html>
+            <body>
+                <h2>YouTube Automation Result</h2>
+                <p>Here's the screenshot of YouTube as requested.</p>
+                <p>Page title was: {}</p>
+            </body>
+        </html>
+        """.format(driver.title if 'driver' in locals() else 'N/A')
+        
+        msg.attach(MIMEText(body, 'html'))
+        
+        # Attach screenshot
+        with open(screenshot_path, 'rb') as f:
+            img = MIMEImage(f.read())
+            img.add_header('Content-Disposition', 'attachment', filename=os.path.basename(screenshot_path))
+            msg.attach(img)
+        
+        # Send email
+        with smtplib.SMTP(CONFIG['email']['smtp_server'], CONFIG['email']['smtp_port']) as server:
+            server.starttls()
+            server.login(CONFIG['email']['sender'], CONFIG['email']['password'])
+            server.sendmail(
+                CONFIG['email']['sender'],
+                CONFIG['email']['recipients'],
+                msg.as_string()
+            )
+        
+        logging.info("Email sent successfully!")
+        return True
+        
+    except Exception as e:
+        logging.error(f"Failed to send email: {str(e)}")
+        return False
 
 def setup_environment():
     """Set up the environment for Chrome to run"""
@@ -193,6 +251,10 @@ def main():
             driver.save_screenshot(screenshot_path)
             logging.info(f"Screenshot saved to {screenshot_path}")
             
+            # Send email with screenshot
+            if not send_email_with_screenshot(screenshot_path):
+                raise RuntimeError("Failed to send email")
+            
             # Keep browser open briefly for debugging
             time.sleep(3)
             
@@ -207,4 +269,3 @@ def main():
 
 if __name__ == "__main__":
     sys.exit(main())
-    #ll
