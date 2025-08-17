@@ -14,7 +14,7 @@ import time
 # Email settings
 SENDER_EMAIL = "tajuttech360@gmail.com"
 RECIPIENT_EMAILS = ["teejeedeeone@gmail.com"]
-EMAIL_PASSWORD = "ytbk opyg vttp icbn"
+EMAIL_PASSWORD = "clda nqsc scnj kpfd"
 SMTP_SERVER = "smtp.gmail.com"
 SMTP_PORT = 587
 
