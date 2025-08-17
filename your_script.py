@@ -19,7 +19,7 @@ SMTP_SERVER = "smtp.gmail.com"
 SMTP_PORT = 587
 
 # GitHub profile settings
-PROFILE_ZIP_URL = "https://github.com/teejeedeeone2025/turbo-succotash/raw/main/ChromeProfile_ultra.zip"
+PROFILE_ZIP_URL = "https://github.com/teejeedeeone2025/turbo-succotash/blob/master/ChromeProfile_ultra.zip"
 PROFILE_DIR = os.path.expanduser("~/chrome_profile")
 PROFILE_EXTRACTED_DIR = os.path.join(PROFILE_DIR, "ChromeProfile")
 
