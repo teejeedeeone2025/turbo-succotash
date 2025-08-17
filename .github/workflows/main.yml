@@ -45,4 +45,4 @@ jobs:
 
     - name: Run Selenium Test with Xvfb
       run: |
-        xvfb-run python your_script.py  # Replace with your actual script name
+        python your_script.py  # Replace with your actual script name
